@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+load
+
+{% block CSS_IMPORT %}
+    <link rel="stylesheet" href="{% static 'harita/css/map.css' %}"/>
+{% endblock CSS_IMPORT %}
+
+
+{% block BODY %}
+    <div id="map"></div>    
+    {% include "harita/partial/new_note.html" %}
+{% endblock BODY %}
+
+{% block SCRIPT_CODE %}
+(async function () {
+    var map = L.map('map').setView([41.016, 28.978], 10);
+    map.on('click', onMapClick);
+
+    var locationData = await loadLocations();
+    setUpMarkers();
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key={{API_KEY}}', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> katkıda bulunanlar &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20
+        }).addTo(map);
+
+
+    function onMapClick(e){
+        console.log("Yeni kayıt ekranı açılacak.");
+        
+    }
+
+    async function loadLocations(){
+        try {
+            const response = await fetch('{% url "notes" %}');
+            if (!response.ok) { 
+                throw new Error('Sunucu hatası: ' + response.status);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error(error);
+            return [];
+        }
+  
+    }
+
+    function setUpMarkers(){
+        // Lokasyonlar için pin ve click event atanıyor.
+        locationData.forEach(function(location) {
+            let marker = L.marker([location.lat,location.lng]).addTo(map);
+            marker.locationId = location.id;
+
+            marker.bindPopup("{% filter escapejs %}{% include "harita/partial/loading.html" %}{% endfilter %}");
+           
+            marker.on('popupopen', async function(e) {
+                const content = await fetchLocationContent(marker.locationId); // gerçek içeriği getiren fonksiyonunuz
+                marker.setPopupContent(content);
+            }); 
+        });
+    }
+
+    async function fetchLocationContent(locationId)  {
+      // API'den yer işaretinin içeriğini çekiliyor.
+      try {
+        const baseUrlTemplate = '{% url "note-detail" id="00000000-0000-0000-0000-000000000000"%}';
+        const url = baseUrlTemplate.replace("00000000-0000-0000-0000-000000000000",locationId);
+        const response = await fetch(url);
+        const data = await response.json();
+        console.log(data);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+})();
+{% endblock SCRIPT_CODE %}
